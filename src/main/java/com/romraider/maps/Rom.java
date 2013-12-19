@@ -1,6 +1,6 @@
 /*
  * RomRaider Open-Source Tuning, Logging and Reflashing
- * Copyright (C) 2006-2012 RomRaider.com
+ * Copyright (C) 2006-2013 RomRaider.com
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -203,33 +203,15 @@ public class Rom implements Serializable {
     }
 
     public byte[] saveFile() {
-        Table checksum = null;
+        final List<Table> checksumTables = new ArrayList<Table>();
         for (Table table : tables) {
             table.saveFile(binData);
-            if (table.getName().equalsIgnoreCase("Checksum Fix"))
-                checksum = table;
+            if (table.getName().contains("Checksum Fix"))
+                checksumTables.add(table);
         }
-        if (checksum != null && !checksum.isLocked()) {
-            calculateRomChecksum(binData, checksum.getStorageAddress(), checksum.getDataSize());
-        }
-        else if (checksum != null && checksum.isLocked() && !checksum.isButtonSelected()) {
-            Object[] options = {"Yes", "No"};
-            String message = String.format("One or more ROM image Checksums is invalid.  " +
-                    "Calculate new Checksums?%n" +
-                    "(NOTE: this will only fix the Checksums it will NOT repair a corrupt ROM image)");
-            int answer = showOptionDialog(checksum.getEditor(),
-                    message,
-                    "Checksum Fix",
-                    DEFAULT_OPTION,
-                    QUESTION_MESSAGE,
-                    null,
-                    options,
-                    options[0]);
-            if (answer == 0) {
-                calculateRomChecksum(binData, checksum.getStorageAddress(), checksum.getDataSize());
-            }
-        }
-        if (checksum != null) {
+        
+        if (checksumTables.size() == 1) {
+            final Table checksum = checksumTables.get(0);
             byte count = binData[checksum.getStorageAddress() + 207];
             if (count == -1) {
                 count = 1;
@@ -247,6 +229,29 @@ public class Rom implements Serializable {
                     checksum.getStorageAddress() + 204,
                     4);
             setEditStamp(binData, checksum.getStorageAddress());
+        }
+
+        for (Table checksum: checksumTables) {
+            if (!checksum.isLocked()) {
+                calculateRomChecksum(binData, checksum.getStorageAddress(), checksum.getDataSize());
+            }
+            else if (checksum.isLocked() && !checksum.isButtonSelected()) {
+                Object[] options = {"Yes", "No"};
+                final String message = String.format("One or more ROM image Checksums is invalid.  " +
+                        "Calculate new Checksums?%n" +
+                        "(NOTE: this will only fix the Checksums it will NOT repair a corrupt ROM image)");
+                int answer = showOptionDialog(checksum.getEditor(),
+                        message,
+                        "Checksum Fix",
+                        DEFAULT_OPTION,
+                        QUESTION_MESSAGE,
+                        null,
+                        options,
+                        options[0]);
+                if (answer == 0) {
+                    calculateRomChecksum(binData, checksum.getStorageAddress(), checksum.getDataSize());
+                }
+            }
         }
         return binData;
     }
